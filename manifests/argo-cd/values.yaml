@@ -1,0 +1,108 @@
+argo-cd:
+  dex:
+    enabled: false
+  notifications:
+    argocdUrl: "https://example.com"
+    context:
+      githubUrl: "https://example.com"
+      cardImageUrl: "https://avatars.githubusercontent.com/u/30269780?s=200&v=4"
+    triggers:
+      trigger.sync-operation-changed: |
+        - when: app.status.operationState.phase in ['Succeeded'] and app.status.health.status == 'Healthy'
+          oncePer: app.status.sync.revisions
+          send: [app-sync-succeeded]
+        - when: app.status.operationState.phase in ['Error', 'Failed'] or app.status.health.status in ['Degraded']
+          oncePer: app.status.sync.revisions
+          send: [app-sync-failed]
+    templates:
+      template.app-sync-failed: |
+        googlechat:
+          cards: |
+              - header:
+                  title: ArgoCD Bot Notification
+                  subtitle: {{ .app.metadata.name }} Sync Status
+                  imageUrl: "{{.context.cardImageUrl}}"
+                sections:
+                    - widgets:
+                      - keyValue:
+                          topLabel: Started At (UTC)
+                          contentMultiline: true
+                          content: {{.app.status.operationState.startedAt}}
+                    - widgets:
+                        - keyValue:
+                            topLabel: Status
+                            contentMultiline: true
+                            content: FAILURE
+                    - widgets:
+                        - keyValue:
+                            topLabel: Actor
+                            content: |
+                              {{- if .app.status.operationState.operation.initiatedBy.automated}}
+                                "Auto Sync"
+                              {{- else if .app.status.operationState.operation.initiatedBy.username}}
+                                {{.app.status.operationState.operation.initiatedBy.username}}
+                              {{end}}
+                    - widgets:
+                        - keyValue:
+                            topLabel: Revision
+                            contentMultiline: true
+                            content: {{ index .app.status.sync.revisions 1 }}
+                    - widgets:
+                        - buttons:
+                          - textButton:
+                              text: "View Application in Argo"
+                              onClick:
+                                openLink:
+                                  url: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}
+                          - textButton:
+                              text: "View Application in GitHub"
+                              onClick:
+                                openLink:
+                                  url: {{.context.githubUrl}}/{{.app.spec.project}}/tree/{{ index .app.status.sync.revisions 1}}/apps/{{.app.metadata.labels.service}}/{{.app.spec.destination.name}}/values.yaml
+      template.app-sync-succeeded: |
+        googlechat:
+          cards: |
+            - header:
+                title: ArgoCD Bot Notification
+                subtitle: {{ .app.metadata.name }} Sync Status
+                imageUrl: "{{.context.cardImageUrl}}"
+              sections:
+                - widgets:
+                    - keyValue:
+                        topLabel: Started At (UTC)
+                        contentMultiline: true
+                        content: {{.app.status.operationState.startedAt}}
+                - widgets:
+                    - keyValue:
+                        topLabel: Status
+                        contentMultiline: true
+                        content: SUCCESS
+                - widgets:
+                    - keyValue:
+                        topLabel: Actor
+                        content: |
+                          {{- if .app.status.operationState.operation.initiatedBy.automated}}
+                            "Auto Sync"
+                          {{- else if .app.status.operationState.operation.initiatedBy.username}}
+                            {{.app.status.operationState.operation.initiatedBy.username}}
+                          {{end}}
+                - widgets:
+                    - keyValue:
+                        topLabel: Revision
+                        contentMultiline: true
+                        content: |
+                          {{- range .app.status.sync.revisions }}
+                          - {{ . }}
+                          {{- end }}
+                - widgets:
+                    - buttons:
+                      - textButton:
+                          text: "View Application in Argo"
+                          onClick:
+                            openLink:
+                              url: {{.context.argocdUrl}}/applications/{{.app.metadata.name}}
+                      - textButton:
+                          text: "View Application in GitHub"
+                          onClick:
+                            openLink:
+                              url: {{.context.githubUrl}}/{{.app.spec.project}}/tree/{{ index .app.status.sync.revisions 1}}/apps/{{.app.metadata.labels.service}}/{{.app.spec.destination.name}}/values.yaml

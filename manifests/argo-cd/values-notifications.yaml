@@ -1,0 +1,6 @@
+argo-cd:
+  notifications:
+    notifiers:
+      service.googlechat: |
+        webhooks:
+          space-name: $space-name

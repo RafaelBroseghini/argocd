@@ -1,0 +1,39 @@
+{{- range .Values.teams }}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: {{ .name }}-deployments
+  namespace: argocd
+spec:
+  goTemplate: true
+  generators:
+    - git:
+        repoURL: https://github.com/rafaelbroseghini/temp.git
+        revision: HEAD
+        files:
+          - path: "apps/*/*/values.yaml"
+  template:
+    metadata:
+      name: {{ print "'{{ index .path.segments 1}}-{{.path.basename}}'" }}
+      annotations:
+        notifications.argoproj.io/subscribe.sync-operation-changed.googlechat: space-name
+    spec:
+      project: default
+      sources:
+      - repoURL: https://github.com/argoproj/argocd-example-apps.git
+        path: helm-guestbook
+        targetRevision: HEAD
+        helm:
+          values: |
+            nameOverride: {{ print "'{{index .path.segments 1}}-{{.path.basename}}'" }}
+            fullNameOverride: {{ print "'{{index .path.segments 1}}-{{.path.basename}}-guestbook'" }}
+          valueFiles:
+            - {{ print "'$values/apps/{{index .path.segments 1}}/{{.path.basename}}/values.yaml'" }}
+      - repoURL: https://github.com/RafaelBroseghini/temp.git
+        targetRevision: HEAD
+        ref: values
+      destination:
+        server: https://kubernetes.default.svc
+        namespace: dev
+---
+{{- end}}
